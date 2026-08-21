@@ -1,0 +1,51 @@
+# Parameters
+nc: 1 # number of classes
+scales:
+  n: [0.33, 0.25, 1024]
+  s: [0.33, 0.50, 1024]
+
+# YOLOv8.0n backbone with CBAM
+backbone:
+  - [-1, 1, Conv, [64, 3, 2]] # 0-P1/2
+  - [-1, 1, CBAM, [64]] # 1 CBAM attention
+  - [-1, 1, Conv, [128, 3, 2]] # 2-P2/4
+  - [-1, 3, C2f, [128, True]] # 3
+  - [-1, 1, CBAM, [128]] # 4 CBAM attention
+  - [-1, 1, Conv, [256, 3, 2]] # 5-P3/8
+  - [-1, 3, C2f, [256, True]] # 6
+  - [-1, 1, CBAM, [256]] # 7 CBAM attention
+  - [-1, 1, Conv, [512, 3, 2]] # 8-P4/16
+  - [-1, 3, C2f, [512, True]] # 9
+  - [-1, 1, CBAM, [512]] # 10 CBAM attention
+  - [-1, 1, Conv, [1024, 3, 2]] # 11-P5/32
+  - [-1, 3, C2f, [1024, True]] # 12
+  - [-1, 1, SPPF, [1024, 5]] # 13-P5/32
+
+# YOLOv8.0n head with ECA (Efficient Channel Attention)
+head:
+  # P5 path
+  - [-1, 1, nn.Upsample, [None, 2, "nearest"]] # 14
+  - [[-1, 9], 1, Concat, [1]] # 15 cat backbone P4 (C2f)
+  - [-1, 3, C2f, [512]] # 16
+  - [-1, 1, ECA, []] # 17 ECA attention
+
+  # P4 path
+  - [-1, 1, nn.Upsample, [None, 2, "nearest"]] # 18
+  - [[-1, 6], 1, Concat, [1]] # 19 cat backbone P3 (C2f)
+  - [-1, 3, C2f, [256]] # 20
+  - [-1, 1, ECA, []] # 21 ECA attention
+
+  # P3 -> P4
+  - [-1, 1, Conv, [256, 3, 2]] # 22
+  - [[-1, 16], 1, Concat, [1]] # 23 cat head P4
+  - [-1, 3, C2f, [512]] # 24
+  - [-1, 1, ECA, []] # 25 ECA attention
+
+  # P4 -> P5
+  - [-1, 1, Conv, [512, 3, 2]] # 26
+  - [[-1, 13], 1, Concat, [1]] # 27 cat backbone P5 (SPPF)
+  - [-1, 3, C2f, [1024]] # 28
+  - [-1, 1, ECA, []] # 29 ECA attention
+
+  # Detect head
+  - [[21, 25, 29], 1, Detect, [nc]] # Detect(P3, P4, P5)
